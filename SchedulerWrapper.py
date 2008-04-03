@@ -42,7 +42,7 @@ class Scheduler(object):
             import time
             while True:
                 self._scheduler.poll()
-                time.sleep(0.01)
+                #time.sleep(0.01)
 
 
 def _test(a, *args, **kwargs):
