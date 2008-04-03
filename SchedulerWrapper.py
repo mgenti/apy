@@ -32,6 +32,7 @@ class Scheduler(object):
             import wx
             wx.CallLater(millis, callable, *args, **kwargs)
         else:
+            assert len(kwargs) == 0
             self._scheduler.scheduleEvent(callable, args, millis/1000)
 
     def start(self, sleepTime=0.01):
@@ -44,7 +45,7 @@ class Scheduler(object):
                 time.sleep(0.01)
 
 
-def _test(*args, **kwargs):
+def _test(a, *args, **kwargs):
     print "I got called"
     return True
 
@@ -55,6 +56,6 @@ if __name__ == '__main__':
     #frame = wx.Frame(None)
 
     sked = Scheduler()
-    sked.schedule(100, _test)
+    sked.schedule(100, _test, 10)
 
     sked.start()
