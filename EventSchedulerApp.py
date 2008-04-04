@@ -2,6 +2,7 @@
 """Combines EventScheduler and wxPython App"""
 
 
+import time, timeit
 import wx
 import EventScheduler
 
@@ -16,6 +17,7 @@ class EventSchedulerApp(wx.App):
         evtloop = wx.EventLoop()
         old = wx.EventLoop.GetActive()
         wx.EventLoop.SetActive(evtloop)
+        tSlice = 0.001 #sec
 
         # This outer loop determines when to exit the application
         while self.frame:
@@ -25,7 +27,10 @@ class EventSchedulerApp(wx.App):
             # will freeze.  
 
             # call_your_code_here()
+            startTime = timeit.default_timer()
             self.evScheduler.poll()
+            sleepTime = tSlice - (startTime - timeit.default_timer())
+            time.sleep(sleepTime if sleepTime > tSlice else 0)
 
             # This inner loop will process any GUI events
             # until there are no more waiting.
@@ -37,3 +42,10 @@ class EventSchedulerApp(wx.App):
             self.ProcessIdle()
 
         wx.EventLoop.SetActive(old)
+
+
+if __name__ == '__main__':
+    app = EventSchedulerApp()
+    app.frame = wx.Frame(None)
+    app.frame.Show()
+    app.MainLoop()
