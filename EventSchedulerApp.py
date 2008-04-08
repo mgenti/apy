@@ -1,8 +1,8 @@
 # (c) Copyright 2007, Synapse
-"""Combines EventScheduler and wxPython App"""
+"""Combines EventScheduler, asyncore, and wxPython App"""
 
 
-import time, timeit
+import time, timeit, asyncore
 import wx
 import EventScheduler
 
@@ -28,7 +28,11 @@ class EventSchedulerApp(wx.App):
 
             # call_your_code_here()
             startTime = timeit.default_timer()
+
+            asyncore.poll(0.001)
             self.evScheduler.poll()
+
+            #asyncore won't block for timeout if it's not waiting on anything
             sleepTime = tSlice - (startTime - timeit.default_timer())
             time.sleep(sleepTime if sleepTime > tSlice else 0)
 
