@@ -25,28 +25,44 @@
 import time
 import threading
 import bisect
+import operator
+
+
+class EventElement(object):
+  def __init__(self, func, delay=0.0, *args, **kwargs):
+    self.func = func
+    self.params = args
+    self.kwargs = kwargs
+    self.delay = delay
+    self.fireTime = time.time() + delay
+
+  def sortKey(self):
+    return self.fireTime
+
+  def __lt__(self, other):
+    #Used when bisecting the current event queue
+    return operator.lt(self.fireTime, other.fireTime)
+
+  def Stop(self, *args, **kwargs):
+    self.func = self.Stop
+
 
 #---------------------------------------------------------------------------------------------------
 class EventScheduler(object):
-  "Event queue mechanism, asynchronously polled, dispatching bound methods with optional delay."
-  class EventElement(object):
-    def __init__(self, func, params = [], delay = 0.0):
-      self.func = func
-      self.params = params
-      self.delay = delay
-      self.fireTime = time.time() + delay
-
-    def sortKey(self):
-      return self.fireTime
-    
-    def __cmp__(self, other):
-      return cmp(self.fireTime, other.fireTime)
-    
+  """Event queue mechanism, asynchronously polled, dispatching bound methods with optional delay."""
   def __init__(self):
     self.eventQueue = []
     self.lock = threading.RLock()
-    
-  def scheduleEvent(self, func, params = [], delay = 0.0):
+
+  def schedule(self, delay, callable, *args, **kwargs):
+    """Order of parameters is like wx.CallLater and supports keyword arguments unlike scheduleEvent"""
+    event = EventElement(callable, delay, *args, **kwargs)
+    self.lock.acquire()
+    self.eventQueue.append(event)
+    self.lock.release()
+    return event
+
+  def scheduleEvent(self, func, params=[], delay=0.0):
     """Schedule event:
          func is a bound method or callable object, return True to reschedule,
          return float value to set new delay AND reschedule;
@@ -54,7 +70,7 @@ class EventScheduler(object):
          delay is in seconds
     """
     self.lock.acquire()
-    self.eventQueue.append(EventScheduler.EventElement(func, params, delay))
+    self.eventQueue.append(EventElement(func, delay, *params))
     self.lock.release()
 
   def scheduleEvents(self, eventList):
@@ -66,19 +82,18 @@ class EventScheduler(object):
     self.lock.acquire()
     self.eventQueue.extend(eventList)
     self.lock.release()
-    
+
   def poll(self):
-    "Run the event scheduler"
-    eNow = EventScheduler.EventElement(None, None, 0)
+    """Run the event scheduler"""
     self.lock.acquire()
-    self.eventQueue.sort(key=EventScheduler.EventElement.sortKey)
-    i = bisect.bisect_right(self.eventQueue, eNow)
+    self.eventQueue.sort(key=EventElement.sortKey)
+    i = bisect.bisect_right(self.eventQueue, EventElement(None, 0))
     workq = self.eventQueue[:i]
     self.eventQueue = self.eventQueue[i:]
     self.lock.release()
 
     for e in workq:
-      rv = e.func(*e.params)
+      rv = e.func(*e.params, **e.kwargs)
       if isinstance(rv, bool):
         reschedule = rv
       elif isinstance(rv, float) or isinstance(rv, int):
@@ -93,14 +108,20 @@ class EventScheduler(object):
         self.eventQueue.append(e)
         self.lock.release()
 
-
   def printQueue(self):
-    "Debugging helper"
+    """Debugging helper"""
     for mye in self.eventQueue:
       try:
         print mye.params[0], mye.fireTime, mye.delay
       except:
         print "no params", mye.fireTime, mye.delay
+
+  def unschedule(self, event):
+    """Removes the scheduled event from the queue"""
+    self.lock.acquire()
+    self.eventQueue.remove(event)
+    self.lock.release()
+
 
 #---------------------------------------------------------------------------------------------------
 if __name__=='__main__':
@@ -111,25 +132,35 @@ if __name__=='__main__':
     def a(self):
       print "a - rescheduled"
       return True
-      
+
     def b(self, p1, p2):
       print "b" + p1 + p2
       sked.scheduleEvent(self.c)
       return False
-    
+
     def c(self):
       print "c"
-    
+
+    def d(self):
+      raise Exception("I SHOULDN'T RUN")
+
+
   class C:
     "Test EventScheduler with a callable instance"
     def __call__(self):
       print "C - not rescheduled"
       return False
-      
+
+
   x = Test()  
   sked.scheduleEvent(x.a, delay = 3.0)
   sked.scheduleEvent(x.b, [" demo ", "parameter"], delay = 10.0)
   sked.scheduleEvent(C())
+  sked.schedule(0.0, x.b, "arg", p2="keyword")
+  event = sked.schedule(0.1, x.d)
+  sked.unschedule(event)
+  event = sked.schedule(0.2, x.d)
+  event.Stop()
 
   # Check speed of scheduling lots of events at once
   immediateCount = 0
@@ -138,7 +169,7 @@ if __name__=='__main__':
     immediateCount += 1
     if immediateCount % 1000 == 0:
       print "immediateCount: %d" % immediateCount
-  
+
   import timeit
   t = timeit.Timer("sked.scheduleEvent(immediateFunc)", "from __main__ import sked, immediateFunc")
   print t.timeit(10000)
@@ -146,7 +177,7 @@ if __name__=='__main__':
   # Now test the "en mass" version of scheduling
   evs = []
   for i in range(10000):
-    evs.insert(0, EventScheduler.EventElement(immediateFunc))
+    evs.insert(0, EventElement(immediateFunc))
 
   t = timeit.Timer("sked.scheduleEvents(evs)", "from __main__ import sked, evs")
   print t.timeit(1)
