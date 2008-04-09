@@ -38,6 +38,7 @@ or provide event-based interlocks.   The xmlrpclib.MultiCall class provides Mult
 """
 
 
+import SimpleAsyncHTTPServer
 import SimpleXMLRPCServer
 import xmlrpclib #Needs to be at least rev 52790 to marshall new-style objects
 import socket
@@ -210,7 +211,7 @@ class AsyncXMLRPCServer(asyncore.dispatcher, AsyncXMLRPCDispatcher):
     AsyncXMLRPCRequestHandler(clonesocket, self)
 
 
-class XMLRPCRequestHandler(SimpleXMLRPCServer.RequestHandler):
+class XMLRPCRequestHandler(SimpleAsyncHTTPServer.RequestHandler):
   def handle_data(self):
     """
     Invoke the requested method, and either transmit response immediately or register callback to 
@@ -259,8 +260,12 @@ class XMLRPCRequestHandler(SimpleXMLRPCServer.RequestHandler):
     self.outgoing.append(None)
 
 
-class AsyncXMLRPCServer2(AsyncXMLRPCDispatcher, SimpleXMLRPCServer.RequestHandler):
+class AsyncXMLRPCServer2(AsyncXMLRPCDispatcher, SimpleAsyncHTTPServer.RequestHandler):
   def __init__(self, addr):
     AsyncXMLRPCDispatcher.__init__(self)
-    self.srv = SimpleXMLRPCServer.Server(addr[0],addr[1],XMLRPCRequestHandler)
+    self.srv = SimpleAsyncHTTPServer.Server(addr[0],addr[1],XMLRPCRequestHandler)
     self.srv.xmlRpcDispatch = self
+
+
+if __name__ == '__main__':
+  srv = AsyncXMLRPCServer2('http://localhost:8080')
