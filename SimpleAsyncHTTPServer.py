@@ -153,13 +153,15 @@ class RequestHandler(asynchat.async_chat, SimpleHTTPServer.SimpleHTTPRequestHand
         protocol_version = "HTTP/1.1"
         MessageClass = ParseHeaders
         blocksize = 4096
-        
+
         #In enabling the use of buffer objects by setting use_buffer to True,
         #any data block sent will remain in memory until it has actually been
         #sent.
         use_buffer = False
         use_favicon = True
-    
+
+        logResponses = True
+
     def __init__(self, conn, addr, server, logResponses=True):
         asynchat.async_chat.__init__(self,conn)
         self.client_address = addr
@@ -177,7 +179,6 @@ class RequestHandler(asynchat.async_chat, SimpleHTTPServer.SimpleHTTPRequestHand
         self.request_version = "HTTP/1.1"
         self.code = None
         # buffer the response and headers to avoid several calls to select()
-        self.logResponses = logResponses
 
     def update_b(self, fsize):
         if fsize > 1048576:

@@ -262,8 +262,9 @@ class XMLRPCRequestHandler(SimpleAsyncHTTPServer.RequestHandler):
 
 
 class AsyncXMLRPCServer2(AsyncXMLRPCDispatcher, SimpleAsyncHTTPServer.RequestHandler):
-  def __init__(self, addr):
+  def __init__(self, addr, logResponses=True):
     AsyncXMLRPCDispatcher.__init__(self)
+    SimpleAsyncHTTPServer.RequestHandler.logResponses = logResponses
     self.srv = SimpleAsyncHTTPServer.Server(addr[0],addr[1],XMLRPCRequestHandler)
     self.srv.xmlRpcDispatch = self
 
