@@ -160,7 +160,7 @@ class RequestHandler(asynchat.async_chat, SimpleHTTPServer.SimpleHTTPRequestHand
         use_buffer = False
         use_favicon = True
     
-    def __init__(self, conn, addr, server):
+    def __init__(self, conn, addr, server, logResponses=True):
         asynchat.async_chat.__init__(self,conn)
         self.client_address = addr
         self.connection = conn
@@ -177,6 +177,7 @@ class RequestHandler(asynchat.async_chat, SimpleHTTPServer.SimpleHTTPRequestHand
         self.request_version = "HTTP/1.1"
         self.code = None
         # buffer the response and headers to avoid several calls to select()
+        self.logResponses = logResponses
 
     def update_b(self, fsize):
         if fsize > 1048576:

@@ -247,8 +247,9 @@ class XMLRPCRequestHandler(SimpleAsyncHTTPServer.RequestHandler):
     response = xmlrpclib.dumps(response, methodresponse=methodresponse, allow_none=True, encoding=None)
     self.sendResponse(response)
 
-  def sendResponse(self, response):  
-    log.debug("sending response: " + str(response))
+  def sendResponse(self, response):
+    if self.logResponses:
+      log.debug("sending response: " + str(response))
     self.send_response(200)
     self.send_header("Server", 'AsyncXMLRPC/Python')
     self.send_header("Date", time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime()))
