@@ -160,9 +160,11 @@ class RequestHandler(asynchat.async_chat, SimpleHTTPServer.SimpleHTTPRequestHand
         use_buffer = False
         use_favicon = True
 
+        #Added by Synapse
         logResponses = True
+        keepalive = True
 
-    def __init__(self, conn, addr, server, logResponses=True):
+    def __init__(self, conn, addr, server):
         asynchat.async_chat.__init__(self,conn)
         self.client_address = addr
         self.connection = conn
@@ -382,7 +384,9 @@ class RequestHandler(asynchat.async_chat, SimpleHTTPServer.SimpleHTTPRequestHand
             # print (self.protocol_version, code, message)
         self.send_header('Server', self.version_string())
         self.send_header('Date', self.date_time_string())
-    
+        if not self.keepalive:
+            self.send_header('Connection', 'close')
+
     def log_message(self, format, *args):
         sys.stderr.write("%s - - [%s] %s \"%s\" \"%s\"\n" %
                          (self.address_string(),
