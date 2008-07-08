@@ -166,7 +166,7 @@ class MedusaXmlRpcCollector(object):
         self.request.done()
 
 
-class HttpXmlRpcServer(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
+class HttpXmlRpcServer(object):
     def __init__(self, addr, logResponses=True):
         self.httpSrv = http_server.http_server(addr[0], addr[1])
         self.xmlRpcDispatcher = MedusaXmlRpcHandler()
