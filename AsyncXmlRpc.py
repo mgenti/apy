@@ -112,7 +112,7 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
 
         [path, params, query, fragment] = request.split_uri()
 
-        if request.command == 'POST':
+        if request.command.upper() == 'POST':
             request.collector = MedusaXmlRpcCollector(self, request)
         else:
             request.error(400)
@@ -204,8 +204,8 @@ def _test(scheduler):
 
     client = xmlrpclib.ServerProxy("http://localhost:8080", AsyncXMLRPCTransport.AsyncXMLRPCTransport())
     scheduler.schedule(0.0, client.printer, "test")
-    scheduler.schedule(0.5, client.printLater, "test2", 0.5)
-    scheduler.schedule(1, client.stopLoop)
+    scheduler.schedule(0.2, client.printLater, "test2", 0.2)
+    scheduler.schedule(0.5, client.stopLoop) #Make sure this
 
 
 if __name__ == '__main__':
