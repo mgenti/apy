@@ -27,13 +27,22 @@ import socket
 import asyncore
 import urllib
 import Deferred
-import re
 import sys
 import logging
 import xml.parsers
-
+import httplib
+import cStringIO
+import asynchat
 
 log = logging.getLogger(__name__)
+
+
+class HttpLibFakeSocket(object):
+  def __init__(self, data):
+    self._data = data
+
+  def makefile(self, *args, **kwargs):
+    return self._data
 
 
 class AsyncXMLRPCTransport(xmlrpclib.Transport):
@@ -68,6 +77,7 @@ class AsyncXMLRPCTransport(xmlrpclib.Transport):
     """
     return (AsyncXMLRPCTransport.MethodSession(host, request_body, self).deferred,)
 
+
   class MethodSession(asyncore.dispatcher):
     "TCP Session context for a single XMLRPC method call"
 
@@ -85,9 +95,6 @@ class AsyncXMLRPCTransport(xmlrpclib.Transport):
       self.parser = transport.getparser()
       self.request = request_body  # for debug
 
-      # Regular expression to match HTTP Response header
-      self.hdrExpr = re.compile(r'^HTTP/([\d.]+)\s+(\w+)\s+([\w ]*).*^Content-Length\D+(\d+).*<\?xml', re.MULTILINE | re.IGNORECASE | re.DOTALL)
-
       hdr = "POST /RPC2 HTTP/1.0\r\n"\
             "User-Agent: AsyncXMLRPC/Python\r\n"\
             "Content-Type: text/xml\r\n"\
@@ -103,59 +110,34 @@ class AsyncXMLRPCTransport(xmlrpclib.Transport):
 
     #- - - asyncore.dispatcher - - -
     def handle_connect(self):
-      # Active connection succeeded
-      pass
+      #Try to start sending once connected
+      self.handle_write()
 
     def handle_read(self):
-#      log.debug("in handle_read")
-      # Get raw XML data from HTTP Response
-      rcvData = self.recv(8192)
+      rcvData = self.recv(4096)
       if rcvData:
+        #log.debug("Received data: %s" % rcvData)
         self.rxBuf += rcvData
-
-        # Receive state machine: looking within rxBuf for hdr + data
-        while True:
-          if self.state == self.GETHDR:
-            m = self.hdrExpr.match(self.rxBuf)
-            if m:
-              httpVersion = m.group(1)
-              httpResponseCode = m.group(2)
-              httpResponseMsg  = m.group(3)
-              self.contentLen  = int(m.group(4))
-
-              if httpResponseCode != '200':
-                self.deferred.runErrback(xmlrpclib.ProtocolError(self.host, httpResponseCode, httpRespMsg, {}))
-                self.close()
-                return
-
-              # Trim the header from rxBuf
-              self.rxBuf = self.rxBuf[m.end()-5:]
-              self.state = self.GETDATA
-            elif len(self.rxBuf) > 256:
-              # Unknown header, or DOS attack
-              self.deferred.runErrback(xmlrpclib.ProtocolError(self.host, '500', "Unknown header", {}))
-              self.close()
-              break
-            else:
-              break
-          elif self.state == self.GETDATA:
-            if len(self.rxBuf) >= self.contentLen:
-              data = self.rxBuf[:self.contentLen]
-              self.rxBuf = self.rxBuf[self.contentLen:]
-              self.dispatchXmlResponse(data)
-              self.close()
-              self.state = self.GETHDR
-            else:
-              # TODO:  Timeout so we don't wait here forever to receive falsely advertised contentLength
-              break
-#      log.debug('out handle_read')
+        if self.rxBuf.find("</methodResponse>") > -1:
+          resp = httplib.HTTPResponse(HttpLibFakeSocket(cStringIO.StringIO(self.rxBuf)))
+          resp.begin()
+          if resp.status == httplib.OK:
+            self.dispatchXmlResponse(resp.fp.read())
+            assert resp.will_close
+          else:
+            self.deferred.runErrback(xmlrpclib.ProtocolError(self.host, str(resp.status), resp.reason, {}))
+          self.close()
+        else:
+          log.debug("methodResponse not found")
 
     def writable(self):
       # Ready to send
       return self.txBuf
-  
+
     def handle_write(self):
       numSent = self.send(self.txBuf)
+      #if __debug__ and numSent:
+        #log.debug("Sent data: %s" % self.txBuf[:numSent])
       self.txBuf = self.txBuf[numSent:]
 
     def handle_close(self):
@@ -170,14 +152,15 @@ class AsyncXMLRPCTransport(xmlrpclib.Transport):
       self.close()
 
     def handle_expt(self):
-      # TODO:  On Windows, find out why we get here when server goes away.
-      #        This is supposed to be for OOB data!
+      #From EffBot:
+      #Called when a connection fails (Windows), or
+      #when out-of-band data arrives (Unix)
       self.handle_error()
 
     def dispatchXmlResponse(self, response):
       p, u = self.parser
       try:
-#        log.debug("Dispatching response")
+        #log.debug("Dispatching response")
         p.feed(response)
         p.close()
         result = u.close()
