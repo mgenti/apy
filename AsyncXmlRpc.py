@@ -205,7 +205,7 @@ def _test(scheduler):
     client = xmlrpclib.ServerProxy("http://localhost:8080", AsyncXMLRPCTransport.AsyncXMLRPCTransport())
     scheduler.schedule(0.0, client.printer, "test")
     scheduler.schedule(0.2, client.printLater, "test2", 0.2)
-    scheduler.schedule(0.5, client.stopLoop) #Make sure this
+    scheduler.schedule(0.5, client.stopLoop)
 
 
 if __name__ == '__main__':
@@ -221,3 +221,17 @@ if __name__ == '__main__':
     while looping:
         asyncore.poll(0.001)
         scheduler.poll()
+
+    #Some timing code: (last we got 0.003417978594)
+#import timeit
+
+
+#setup = """\
+#from xmlrpclib import ServerProxy, Error
+
+#server = ServerProxy('http://localhost:8080')
+#"""
+
+#t = timeit.Timer(stmt="server.printer('test')", setup=setup)
+
+#print t.timeit(number=100000)/100000
