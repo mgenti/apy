@@ -42,7 +42,7 @@ import sys, xmlrpclib, SimpleXMLRPCServer, string
 
 import Deferred
 
-from medusa import http_server
+from medusa import http_server, logger
 
 
 #Monkey patch for SimpleXMLRPCServer.SimpleXMLRPCDispatcher._marshaled_dispatch to support deferreds
@@ -168,7 +168,7 @@ class MedusaXmlRpcCollector(object):
 
 class HttpXmlRpcServer(object):
     def __init__(self, addr, logResponses=True):
-        self.httpSrv = http_server.http_server(addr[0], addr[1])
+        self.httpSrv = http_server.http_server(addr[0], addr[1], logger_object=logger.python_logger())
         self.xmlRpcDispatcher = MedusaXmlRpcHandler()
         self.httpSrv.install_handler(self.xmlRpcDispatcher)
 
