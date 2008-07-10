@@ -153,9 +153,15 @@ class AsyncXMLRPCTransport(xmlrpclib.Transport):
 
     def handle_expt(self):
       #From EffBot:
-      #Called when a connection fails (Windows), or
-      #when out-of-band data arrives (Unix)
-      self.handle_error()
+      #Called when a connection fails (Windows), or when out-of-band data arrives (Unix)
+      
+      #Since we aren't doing OOB
+      err = self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+      if err:
+        msg = asyncore._strerror(err)
+        self.deferred.runErrback(socket.error(Exception(msg)))
+        log.error(msg) #Using error instead of exception since there is not stack trace
+        self.close()
 
     def dispatchXmlResponse(self, response):
       p, u = self.parser
