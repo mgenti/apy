@@ -12,7 +12,10 @@ class EventSchedulerApp(wx.App):
         self.evScheduler = EventScheduler.EventScheduler()
         self._yielding = False
         wx.App.__init__(self, *args, **kwargs)
+        #Start calling out own event loop
         wx.CallAfter(self.eventLoop)
+        #This timer is used to make sure that we continue to call our functions
+        #even when we are stuck processing GUI event(s) like ShowModal
         self._chkTimer = wx.PyTimer(self._checkYield)
 
     def _checkYield(self):
@@ -24,7 +27,7 @@ class EventSchedulerApp(wx.App):
     def runFuncs(self, tSlice=0.001):
         startTime = timeit.default_timer()
 
-        asyncore.poll(0.001)
+        asyncore.poll(tSlice)
         self.evScheduler.poll()
 
         #asyncore won't block for timeout if it's not waiting on anything
@@ -38,6 +41,8 @@ class EventSchedulerApp(wx.App):
         self._chkTimer.Start(5, True)
         self.Yield(True)
         self._yielding = False
+        #This may eventually need to go within the _yielding but right now
+        #there isn't much called from idle
         self.ProcessIdle()
 
         if self.GetTopWindow() is not None:
