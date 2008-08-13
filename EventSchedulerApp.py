@@ -2,7 +2,7 @@
 """Combines EventScheduler, asyncore, and wxPython App"""
 
 
-import time, timeit, asyncore
+import time, asyncore
 import wx
 import EventScheduler
 
@@ -25,14 +25,12 @@ class EventSchedulerApp(wx.App):
             self._chkTimer.Start(2, True)
 
     def runFuncs(self, tSlice=0.001):
-        startTime = timeit.default_timer()
-
         asyncore.poll(tSlice)
         self.evScheduler.poll()
 
         #asyncore won't block for timeout if it's not waiting on anything
-        sleepTime = tSlice - (startTime - timeit.default_timer())
-        time.sleep(sleepTime if sleepTime > tSlice else 0)
+        if not asyncore.socket_map:
+            time.sleep(tSlice)
 
     def eventLoop(self):
         self.runFuncs()
