@@ -26,6 +26,7 @@ import time
 import threading
 import bisect
 import operator
+#import sys
 
 
 class EventElement(object):
@@ -44,6 +45,8 @@ class EventElement(object):
     return operator.lt(self.fireTime, other.fireTime)
 
   def Stop(self, *args, **kwargs):
+    #if self.func != self.Stop:
+      #print "Stopped %s" % self.func.im_func.func_name
     self.func = self.Stop
 
 
@@ -56,10 +59,12 @@ class EventScheduler(object):
 
   def schedule(self, delay, callable, *args, **kwargs):
     """Order of parameters is like wx.CallLater and supports keyword arguments unlike scheduleEvent"""
+    #print "%s scheduled %s" % (sys._getframe(1).f_code.co_name, callable.im_func.func_name)
     event = EventElement(callable, delay, *args, **kwargs)
     self.lock.acquire()
     self.eventQueue.append(event)
     self.lock.release()
+    #event.creator = sys._getframe(1).f_code.co_name
     return event
 
   def scheduleEvent(self, func, params=[], delay=0.0):
@@ -69,6 +74,7 @@ class EventScheduler(object):
          params is a list of parameters to func;
          delay is in seconds
     """
+    #print "%s scheduled event %s" % (sys._getframe(0).f_code.co_name, func.im_func.func_name)
     self.lock.acquire()
     self.eventQueue.append(EventElement(func, delay, *params))
     self.lock.release()
