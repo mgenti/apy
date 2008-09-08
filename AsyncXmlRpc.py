@@ -38,11 +38,11 @@ or provide event-based interlocks.   The xmlrpclib.MultiCall class provides Mult
 """
 
 
-import sys, xmlrpclib, SimpleXMLRPCServer, string
+import sys, xmlrpclib, SimpleXMLRPCServer, string, socket
 
 import Deferred
 
-from medusa import http_server, logger
+from medusa import http_server, logger, status_handler, counter, producers
 
 
 #Monkey patch for SimpleXMLRPCServer.SimpleXMLRPCDispatcher._marshaled_dispatch to support deferreds
@@ -92,12 +92,23 @@ SimpleXMLRPCServer.SimpleXMLRPCDispatcher._marshaled_dispatch = _marshaled_dispa
 
 class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
     """Gets installed into Medusa http_server to handle XML-RPC requests"""
-    def __init__(self):
+    def __init__(self, logger_object=None, logResponses=True, logRequests=True):
         SimpleXMLRPCServer.SimpleXMLRPCDispatcher.__init__(self, allow_none=True, encoding=None)
+        self.requestCntr = counter.counter()
+        self.logger = logger_object
+        self.logRequests = logRequests
+        self.logResponses = logResponses
 
     def dispatchRequest(self, data, collector):
         #Called by a collector
         assert isinstance(collector, MedusaXmlRpcCollector)
+
+        if self.logRequests:
+            try:
+                params, method = xmlrpclib.loads(data)
+                self.logger.log('%s%s' % (method, params))
+            except:
+                pass
 
         response = self._marshaled_dispatch(data)
         if isinstance(response, Deferred.Deferred):
@@ -113,7 +124,8 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
         [path, params, query, fragment] = request.split_uri()
 
         if request.command.upper() == 'POST':
-            request.collector = MedusaXmlRpcCollector(self, request)
+            request.collector = MedusaXmlRpcCollector(self, request, self.logger, self.logResponses)
+            self.requestCntr.increment()
         else:
             request.error(400)
 
@@ -126,14 +138,21 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
 
         return False
 
+    def status(self):
+        return producers.simple_producer (
+                '<li>XML-RPC <b>Requests</b> : %s' % self.requestCntr
+                )
+
 
 class MedusaXmlRpcCollector(object):
-    def __init__(self, handler, request):
+    def __init__(self, handler, request, logger_object=None, logResponses=True):
         assert isinstance(handler, MedusaXmlRpcHandler)
         assert isinstance(request, http_server.http_request)
         self.handler = handler
         self.request = request
         self.data = []
+        self.logger = logger_object
+        self.logResponses = logResponses
 
         # make sure there's a content-length header
         cl = request.get_header('content-length')
@@ -164,13 +183,18 @@ class MedusaXmlRpcCollector(object):
         self.request['Content-Type'] = 'text/xml'
         self.request.push(response)
         self.request.done()
+        if self.logResponses and self.logger is not None:
+            self.logger.log(response)
 
 
 class HttpXmlRpcServer(object):
-    def __init__(self, addr, logResponses=True):
+    def __init__(self, addr, logResponses=True, logRequests=True, status=False):
         self.httpSrv = http_server.http_server(addr[0], addr[1], logger_object=logger.python_logger())
-        self.xmlRpcDispatcher = MedusaXmlRpcHandler()
+        self.xmlRpcDispatcher = MedusaXmlRpcHandler(logger_object=logger.python_logger(), logRequests=logRequests, logResponses=logResponses)
         self.httpSrv.install_handler(self.xmlRpcDispatcher)
+        if status:
+            sh = status_handler.status_extension([self.httpSrv, self.xmlRpcDispatcher])
+            self.httpSrv.install_handler(sh)
 
 
 def _test(scheduler):
@@ -223,15 +247,15 @@ if __name__ == '__main__':
         scheduler.poll()
 
     #Some timing code: (last we got 0.003417978594)
-#import timeit
+    #import timeit
 
 
-#setup = """\
-#from xmlrpclib import ServerProxy, Error
+    #setup = """\
+    #from xmlrpclib import ServerProxy, Error
 
-#server = ServerProxy('http://localhost:8080')
-#"""
+    #server = ServerProxy('http://localhost:8080')
+    #"""
 
-#t = timeit.Timer(stmt="server.printer('test')", setup=setup)
+    #t = timeit.Timer(stmt="server.printer('test')", setup=setup)
 
-#print t.timeit(number=100000)/100000
+    #print t.timeit(number=100000)/100000
