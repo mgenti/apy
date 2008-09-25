@@ -35,6 +35,7 @@ import httplib
 import cStringIO
 import asynchat
 
+
 log = logging.getLogger(__name__)
 
 
@@ -105,9 +106,9 @@ class AsyncXMLRPCTransport(xmlrpclib.Transport):
       # Setup async response handler
       self.deferred = Deferred.Deferred()
 
-      # Connect to host and POST request       
-      self.connect(urllib.splitnport(host, 80))
+      # Connect to host and POST request
 
+      self.connect(urllib.splitnport(host, 80))
 
     #- - - asyncore.dispatcher - - -
     def handle_connect(self):
@@ -142,7 +143,9 @@ class AsyncXMLRPCTransport(xmlrpclib.Transport):
       self.txBuf = self.txBuf[numSent:]
 
     def handle_close(self):
+      #This seems to be only called when the other side closes the connection
       self.close()
+      self.deferred.runErrback(xmlrpclib.ProtocolError(self.host, '500', 'Socket Closed', {}))
 
     def handle_error(self):
       t, v, nil = sys.exc_info()
@@ -163,7 +166,7 @@ class AsyncXMLRPCTransport(xmlrpclib.Transport):
         if msg == 'Unknown error':
           msg += ' - '
           msg += str(err)
-        self.deferred.runErrback(socket.error(Exception(msg)))
+        self.deferred.runErrback(socket.error((err, msg)))
         log.error(msg) #Using error instead of exception since there is not a stack trace
         self.close()
 
