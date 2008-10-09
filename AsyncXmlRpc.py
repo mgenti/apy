@@ -38,7 +38,7 @@ or provide event-based interlocks.   The xmlrpclib.MultiCall class provides Mult
 """
 
 
-import sys, xmlrpclib, SimpleXMLRPCServer, string, socket
+import sys, xmlrpclib, SimpleXMLRPCServer
 
 import Deferred
 
@@ -121,7 +121,7 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
         #Called by medusa http_server
         assert isinstance(request, http_server.http_request)
 
-        [path, params, query, fragment] = request.split_uri()
+        request.split_uri()
 
         if request.command.upper() == 'POST':
             request.collector = MedusaXmlRpcCollector(self, request, self.logger, self.logResponses)
@@ -160,7 +160,7 @@ class MedusaXmlRpcCollector(object):
         if not cl:
             request.error(411)
         else:
-            cl = string.atoi(cl)
+            cl = int(cl)
             # using a 'numeric' terminator
             self.request.channel.set_terminator(cl)
 
