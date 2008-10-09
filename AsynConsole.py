@@ -1,3 +1,4 @@
+"""An Asynchornous Console for apy"""
 #Copyright (c) 2007 David Ewing Mark Guagenti
 
 #Permission is hereby granted, free of charge, to any person
@@ -20,23 +21,22 @@
 #WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 #FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 #OTHER DEALINGS IN THE SOFTWARE."""
-
+__docformat__ = "plaintext en"
 
 import sys
 from code import InteractiveInterpreter
-from Deferred import *
-from PostThread import *
-from EventScheduler import *
+from PostThread import PostThread
+from EventScheduler import EventScheduler
+
 
 class AsynConsole(InteractiveInterpreter):
-    """Closely emulate the behavior of the interactive Python interpreter.
+    """Closely emulates the behavior of the interactive Python interpreter.
 
     This class builds on InteractiveInterpreter and adds prompting
     using the familiar sys.ps1 and sys.ps2, and input buffering.
-
     """
 
-    def __init__(self, evScheduler, locals=None, filename="<console>"):
+    def __init__(self, evScheduler_, locals_=None, filename="<console>"):
         """Constructor.
 
         The optional locals argument will be passed to the
@@ -44,25 +44,19 @@ class AsynConsole(InteractiveInterpreter):
 
         The optional filename argument should specify the (file)name
         of the input stream; it will show up in tracebacks.
-
         """
-        InteractiveInterpreter.__init__(self, locals)
+        InteractiveInterpreter.__init__(self, locals_)
         self.filename = filename
-        self.resetbuffer()
-        
-        #my stuff
-        try:
-            sys.ps1
-        except AttributeError:
+        self.buffer = []
+
+        if not hasattr(sys, 'ps1'):
             sys.ps1 = ">>> "
-        try:
-            sys.ps2
-        except AttributeError:
+        if not hasattr(sys, 'ps2'):
             sys.ps2 = "... "
 
         self.more = 0
         self.loop = False
-        self.evScheduler = evScheduler
+        self.evScheduler = evScheduler_
         self.postThread = PostThread()
 
     def resetbuffer(self):
@@ -70,31 +64,31 @@ class AsynConsole(InteractiveInterpreter):
         self.buffer = []
 
     def _getLine(self):
-      """Uses PostThread to wait for a line from raw_input"""
-      if self.more:
-        prompt = sys.ps2
-      else:
-        prompt = sys.ps1
+        """Uses PostThread to wait for a line from raw_input"""
+        if self.more:
+            prompt = sys.ps2
+        else:
+            prompt = sys.ps1
 
-      self.postThread.post(self.evScheduler, raw_input, [prompt]).addCallbacks(self._gotLine, self._errGotLine)
+        self.postThread.post(self.evScheduler, raw_input, [prompt]).addCallbacks(self._gotLine, self._errGotLine)
 
     def _gotLine(self, line):
-      """Callback for successfully reading a line"""
-      self.more = self.push(line)
-      if self.loop:
-        self.evScheduler.scheduleEvent(self._getLine)
+        """Callback for successfully reading a line"""
+        self.more = self.push(line)
+        if self.loop:
+            self.evScheduler.scheduleEvent(self._getLine)
 
     def _errGotLine(self, returnResult):
-      """Callback if an exception occurrs while reading a line"""
-      if returnResult[0] == EOFError:
-        self.write("\n")
-#        print "caught EOF"
-      else:
-        print "Unknown Error:", returnResult
+        """Callback if an exception occurrs while reading a line"""
+        if returnResult[0] == EOFError:
+            self.write("\n")
+            #print "caught EOF"
+        else:
+            print "Unknown Error:", returnResult
 
     def stopInteract(self):
-      """Stop the interactive console"""
-      self.loop = False
+        """Stop the interactive console"""
+        self.loop = False
 
     def interact(self, banner=None):
         """Closely emulate the interactive Python console.
@@ -108,15 +102,15 @@ class AsynConsole(InteractiveInterpreter):
 
         """
         if not self.loop:
-          cprt = 'Type "help", "copyright", "credits" or "license" for more information.'
-          if banner is None:
-            self.write("Python %s on %s\n%s\n(%s)\n" %
-                       (sys.version, sys.platform, cprt,
-                        self.__class__.__name__))
-          else:
-            self.write("%s\n" % str(banner))
-          self.loop = True
-          self.evScheduler.scheduleEvent(self._getLine)
+            cprt = 'Type "help", "copyright", "credits" or "license" for more information.'
+            if banner is None:
+                self.write("Python %s on %s\n%s\n(%s)\n" %
+                           (sys.version, sys.platform, cprt,
+                            self.__class__.__name__))
+            else:
+                self.write("%s\n" % str(banner))
+            self.loop = True
+            self.evScheduler.scheduleEvent(self._getLine)
 
     def push(self, line):
         """Push a line to the interpreter.
@@ -140,14 +134,14 @@ class AsynConsole(InteractiveInterpreter):
         return more
 
 if __name__ == '__main__':
-  import time
+    import time
 
-  localTest = 5
+    localTest = 5
 
-  evScheduler = EventScheduler()
-  myConsole = AsynConsole(evScheduler, locals()).interact()
+    evScheduler = EventScheduler()
+    myConsole = AsynConsole(evScheduler, locals()).interact()
 
-  print "Now in event loop..."
-  while True:
-    evScheduler.poll()
-    time.sleep(0.01)
+    print "Now in event loop..."
+    while True:
+        evScheduler.poll()
+        time.sleep(0.01)
