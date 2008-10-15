@@ -1,0 +1,160 @@
+#Copyright (c) 2007 David Ewing Mark Guagenti
+
+#Permission is hereby granted, free of charge, to any person
+#obtaining a copy of this software and associated documentation
+#files (the "Software"), to deal in the Software without
+#restriction, including without limitation the rights to use,
+#copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the
+#Software is furnished to do so, subject to the following
+#conditions:
+
+#The above copyright notice and this permission notice shall be
+#included in all copies or substantial portions of the Software.
+
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+#OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+#NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+#WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+#FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+#OTHER DEALINGS IN THE SOFTWARE."""
+
+
+import time
+import threading
+import bisect
+
+#---------------------------------------------------------------------------------------------------
+class EventScheduler(object):
+  "Event queue mechanism, asynchronously polled, dispatching bound methods with optional delay."
+  class EventElement(object):
+    def __init__(self, func, params = [], delay = 0.0):
+      self.func = func
+      self.params = params
+      self.delay = delay
+      self.fireTime = time.time() + delay
+
+    def sortKey(self):
+      return self.fireTime
+    
+    def __cmp__(self, other):
+      return cmp(self.fireTime, other.fireTime)
+    
+  def __init__(self):
+    self.eventQueue = []
+    self.lock = threading.RLock()
+    
+  def scheduleEvent(self, func, params = [], delay = 0.0):
+    """Schedule event:
+         func is a bound method or callable object, return True to reschedule,
+         return float value to set new delay AND reschedule;
+         params is a list of parameters to func;
+         delay is in seconds
+    """
+    self.lock.acquire()
+    self.eventQueue.append(EventScheduler.EventElement(func, params, delay))
+    self.lock.release()
+
+  def scheduleEvents(self, eventList):
+    """Schedule a list of EventElements:
+         This is an alternative to discrete scheduleEvent() calls, but accomplishes the same thing.
+         It takes the thread-lock fewer times, but may not actually be faster than discrete calls
+         to scheduleEvent() if the average size of the eventQueue is large.
+    """
+    self.lock.acquire()
+    self.eventQueue.extend(eventList)
+    self.lock.release()
+    
+  def poll(self):
+    "Run the event scheduler"
+    eNow = EventScheduler.EventElement(None, None, 0)
+    self.lock.acquire()
+    self.eventQueue.sort(key=EventScheduler.EventElement.sortKey)
+    i = bisect.bisect_right(self.eventQueue, eNow)
+    workq = self.eventQueue[:i]
+    self.eventQueue = self.eventQueue[i:]
+    self.lock.release()
+
+    for e in workq:
+      rv = e.func(*e.params)
+      if isinstance(rv, bool):
+        reschedule = rv
+      elif isinstance(rv, float) or isinstance(rv, int):
+        e.delay = rv
+        reschedule = True
+      else:
+        reschedule = False
+      if reschedule:
+        e.fireTime = time.time() + e.delay
+        #e.fireTime += e.delay     # If we wanted accurate periodicity, versus accurate intervals
+        self.lock.acquire()
+        self.eventQueue.append(e)
+        self.lock.release()
+
+
+  def printQueue(self):
+    "Debugging helper"
+    for mye in self.eventQueue:
+      try:
+        print mye.params[0], mye.fireTime, mye.delay
+      except:
+        print "no params", mye.fireTime, mye.delay
+
+#---------------------------------------------------------------------------------------------------
+if __name__=='__main__':
+  sked = EventScheduler()
+  
+  class Test:
+    "Test EventScheduler with bound methods"
+    def a(self):
+      print "a - rescheduled"
+      return True
+      
+    def b(self, p1, p2):
+      print "b" + p1 + p2
+      sked.scheduleEvent(self.c)
+      return False
+    
+    def c(self):
+      print "c"
+    
+  class C:
+    "Test EventScheduler with a callable instance"
+    def __call__(self):
+      print "C - not rescheduled"
+      return False
+      
+  x = Test()  
+  sked.scheduleEvent(x.a, delay = 3.0)
+  sked.scheduleEvent(x.b, [" demo ", "parameter"], delay = 10.0)
+  sked.scheduleEvent(C())
+
+  # Check speed of scheduling lots of events at once
+  immediateCount = 0
+  def immediateFunc():
+    global immediateCount
+    immediateCount += 1
+    if immediateCount % 1000 == 0:
+      print "immediateCount: %d" % immediateCount
+  
+  import timeit
+  t = timeit.Timer("sked.scheduleEvent(immediateFunc)", "from __main__ import sked, immediateFunc")
+  print t.timeit(10000)
+
+  # Now test the "en mass" version of scheduling
+  evs = []
+  for i in range(10000):
+    evs.insert(0, EventScheduler.EventElement(immediateFunc))
+
+  t = timeit.Timer("sked.scheduleEvents(evs)", "from __main__ import sked, evs")
+  print t.timeit(1)
+
+
+  while True:
+    sked.poll()
+    time.sleep(0.1)
+
+
+#---------------------------------------------------------------------------------------------------
