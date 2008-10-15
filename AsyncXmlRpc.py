@@ -98,6 +98,7 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
         self.logger = logger_object
         self.logRequests = logRequests
         self.logResponses = logResponses
+        self.closeCallbacks = []
 
     def dispatchRequest(self, data, collector):
         #Called by a collector
@@ -113,6 +114,16 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
         response = self._marshaled_dispatch(data)
         if isinstance(response, Deferred.Deferred):
             response.addCallbacks(collector.marshalAndSendResponse)
+
+            def onClose(self=self, channel=collector.request.channel, deferred=response):
+                channel.close()
+                for callback in self.closeCallbacks:
+                    try:
+                        callback(deferred)
+                    except:
+                        self.logger.log("An error occurred while notifying a callback of a close event")
+
+            collector.request.channel.handle_close = onClose
         else:
             # got a valid XML RPC response
             collector.sendResponse(response)
@@ -137,6 +148,15 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
             return True
 
         return False
+
+    def registerCloseCallbacks(self, callback):
+        """
+        Register for callbacks when a socket gets closed
+
+        callback -- A callable expecting a single parameter filled in with a deferred
+        """
+        if callable(callback):
+            self.closeCallbacks.append(callback)
 
     def status(self):
         return producers.simple_producer (
