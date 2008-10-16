@@ -33,7 +33,6 @@ import logging
 import xml.parsers
 import httplib
 import cStringIO
-import asynchat
 
 
 log = logging.getLogger(__name__)
@@ -48,11 +47,13 @@ class HttpLibFakeSocket(object):
 
 
 class Keep_Alive_Session(asyncore.dispatcher):
-  def __init__(self, host, request_body, transport):
+  def __init__(self, host, transport, close_callable=None):
     asyncore.dispatcher.__init__(self)
     self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
     self.host = host
     self.getparser = transport.getparser
+    self.close_callable = close_callable
+    self.deferred = None
     self.waiting_on_response = False
     self.rx_buf = ""
     self.tx_buf = ""
@@ -60,69 +61,32 @@ class Keep_Alive_Session(asyncore.dispatcher):
     # Connect to host and POST request
     self.connect(urllib.splitnport(host, 80))
 
-    log.debug("New Keep_Alive_Session Created")
+    #log.debug("New Keep_Alive_Session Created")
 
-  def send_request(self, request_body):
-    #print "send_request CALLED"
-    assert not self.closing
-    if self.waiting_on_response:
-      raise Exception("BAD!!!")
+  def dispatchXmlResponse(self, response):
+      p, u = self.getparser()
+      try:
+        #log.debug("Dispatching response")
+        p.feed(response)
+        p.close()
+        result = u.close()
 
-    keep_alive = "\r\n"
-    if not self.connected:
-      keep_alive = "Connection: Keep-Alive\r\n\r\n"
-    self.tx_buf += "POST /RPC2 HTTP/1.1\r\n" \
-        "Content-Type: text/xml\r\n" \
-        "User-Agent: AsyncXMLRPC/Python\r\n" \
-        "Host: %s\r\n" \
-        "Content-length: %d\r\n" \
-        "%s%s" % (self.host, len(request_body), keep_alive, request_body)
-    #If we have data to send than we will be waiting on a response
-    self.waiting_on_response = True
-    self.deferred = Deferred.Deferred()
-    return self.deferred
+        # Post this result to the Deferred object bound to this response
+        self.deferred.runCallback(result[0])
 
-  def handle_connect(self):
-    #Try to start sending once connected
-    self.handle_write()
-
-  def handle_read(self):
-    recv_data = self.recv(4096)
-    if recv_data:
-      #log.debug("Received data: %s" % rcvData)
-      self.rx_buf += recv_data
-      if self.rx_buf.find("</methodResponse>") > -1:
-        self.waiting_on_response = False
-        resp = httplib.HTTPResponse(HttpLibFakeSocket(cStringIO.StringIO(self.rx_buf)))
-        resp.begin()
-        if resp.status == httplib.OK:
-          if resp.chunked:
-            #Skip the chunk lengths
-            self.dispatchXmlResponse(''.join(resp.fp.readlines()[1:-2]))
-          else:
-            self.dispatchXmlResponse(resp.fp.read())
-          #assert resp.will_close
-        else:
-          self.deferred.runErrback(xmlrpclib.ProtocolError(self.host, str(resp.status), resp.reason, {}))
-        self.rx_buf = ""
-        #self.close()
-
-  def writable(self):
-    # Ready to send
-    return self.tx_buf
-
-  def handle_write(self):
-    numSent = self.send(self.tx_buf)
-    self.tx_buf = self.tx_buf[numSent:]
-    #if __debug__ and numSent:
-      #log.debug("Sent data: %s" % self.tx_buf[:numSent])
-      #log.debug("Still %i bytes left" % (len(self.tx_buf)))
+      # Catch XMLRPC "faultCode" response parsing (raised by the 'close' method)
+      except (xmlrpclib.Fault, xml.parsers.expat.ExpatError), e:
+        self.deferred.runErrback(e)
 
   def handle_close(self):
     #This seems to be only called when the other side closes the connection
     self.close()
-    self.connected = False
-    self.deferred.runErrback(xmlrpclib.ProtocolError(self.host, '500', 'Socket Closed', {}))
+    if callable(self.close_callable):
+      self.close_callable(self)
+
+  def handle_connect(self):
+    #Try to start sending once connected
+    self.handle_write()
 
   def handle_error(self):
     t, v, nil = sys.exc_info()
@@ -147,20 +111,55 @@ class Keep_Alive_Session(asyncore.dispatcher):
       log.error(msg) #Using error instead of exception since there is not a stack trace
       self.close()
 
-  def dispatchXmlResponse(self, response):
-      p, u = self.getparser()
-      try:
-        #log.debug("Dispatching response")
-        p.feed(response)
-        p.close()
-        result = u.close()
+  def handle_read(self):
+    recv_data = self.recv(4096)
+    if recv_data:
+      #log.debug("Received data: %s" % rcvData)
+      self.rx_buf += recv_data
+      if self.rx_buf.find("</methodResponse>") > -1:
+        self.waiting_on_response = False
+        resp = httplib.HTTPResponse(HttpLibFakeSocket(cStringIO.StringIO(self.rx_buf)))
+        resp.begin()
+        if resp.status == httplib.OK:
+          if resp.chunked:
+            #Skip the chunk lengths
+            self.dispatchXmlResponse(''.join(resp.fp.readlines()[1:-2]))
+          else:
+            self.dispatchXmlResponse(resp.fp.read())
+        else:
+          self.deferred.runErrback(xmlrpclib.ProtocolError(self.host, str(resp.status), resp.reason, {}))
+        self.rx_buf = ""
 
-        # Post this result to the Deferred object bound to this response
-        self.deferred.runCallback(result[0])
+  def handle_write(self):
+    numSent = self.send(self.tx_buf)
+    self.tx_buf = self.tx_buf[numSent:]
+    #if __debug__ and numSent:
+      #log.debug("Sent data: %s" % self.tx_buf[:numSent])
+      #log.debug("Still %i bytes left" % (len(self.tx_buf)))
 
-      # Catch XMLRPC "faultCode" response parsing (raised by the 'close' method)
-      except (xmlrpclib.Fault, xml.parsers.expat.ExpatError), e:
-        self.deferred.runErrback(e)
+  def send_request(self, request_body):
+    #print "send_request CALLED"
+    assert not self.closing
+    if self.waiting_on_response:
+      raise Exception("BAD!!!")
+
+    keep_alive = "\r\n"
+    if not self.connected:
+      keep_alive = "Connection: Keep-Alive\r\n\r\n"
+    self.tx_buf += "POST /RPC2 HTTP/1.1\r\n" \
+        "Content-Type: text/xml\r\n" \
+        "User-Agent: AsyncXMLRPC/Python\r\n" \
+        "Host: %s\r\n" \
+        "Content-length: %d\r\n" \
+        "%s%s" % (self.host, len(request_body), keep_alive, request_body)
+    #If we have data to send than we will be waiting on a response
+    self.waiting_on_response = True
+    self.deferred = Deferred.Deferred()
+    return self.deferred
+
+  def writable(self):
+    # Ready to send
+    return self.tx_buf
 
 
 class Keep_Alive_Transport(xmlrpclib.Transport):
@@ -191,6 +190,9 @@ class Keep_Alive_Transport(xmlrpclib.Transport):
     xmlrpclib.Transport.__init__(self, *args, **kwargs)
     self.sessions = []
 
+  def on_close(self, session):
+    self.sessions.remove(session)
+
   def request(self, host, handler, request_body, verbose=0):
     """Send a complete request, and parse the response.
        Return a Deferred response object.       
@@ -199,11 +201,10 @@ class Keep_Alive_Transport(xmlrpclib.Transport):
     session = None
     for session in self.sessions:
       if not session.waiting_on_response:
-        usable_session = session
         break
 
     if session is None or session.waiting_on_response:
-      session = Keep_Alive_Session(host, request_body, self)
+      session = Keep_Alive_Session(host, self, self.on_close)
       self.sessions.append(session)
 
     return (session.send_request(request_body),)
@@ -370,7 +371,6 @@ class MultiCall(xmlrpclib.MultiCall):
     return mcIter.results
 
 if __name__ == '__main__':
-  import logging
   logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(msecs)03d %(levelname)-8s %(name)-8s %(message)s', datefmt='%H:%M:%S')
 
   #srv_async = xmlrpclib.ServerProxy("http://192.168.1.66:8080", Keep_Alive_Transport())
