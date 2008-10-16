@@ -33,6 +33,8 @@ class Deferred(object):
   value from a non-blocking method call, to which callbacks may be attached.
   """
   def __init__(self):
+    if __debug__:
+      self.fn, self.lno, self.func = log.findCaller()
     self.callback = None
     self.errback = None
 
