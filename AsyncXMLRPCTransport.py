@@ -60,10 +60,13 @@ class Keep_Alive_Session(asyncore.dispatcher):
     # Connect to host and POST request
     self.connect(urllib.splitnport(host, 80))
 
+    log.debug("New Keep_Alive_Session Created")
+
   def send_request(self, request_body):
+    #print "send_request CALLED"
+    assert not self.closing
     if self.waiting_on_response:
-      #raise Exception("BAD!!!")
-      pass
+      raise Exception("BAD!!!")
 
     keep_alive = "\r\n"
     if not self.connected:
@@ -74,6 +77,8 @@ class Keep_Alive_Session(asyncore.dispatcher):
         "Host: %s\r\n" \
         "Content-length: %d\r\n" \
         "%s%s" % (self.host, len(request_body), keep_alive, request_body)
+    #If we have data to send than we will be waiting on a response
+    self.waiting_on_response = True
     self.deferred = Deferred.Deferred()
     return self.deferred
 
@@ -107,11 +112,11 @@ class Keep_Alive_Session(asyncore.dispatcher):
     return self.tx_buf
 
   def handle_write(self):
-    self.waiting_on_response = True
     numSent = self.send(self.tx_buf)
-    #if __debug__ and numSent:
-      #log.debug("Sent data: %s" % self.txBuf[:numSent])
     self.tx_buf = self.tx_buf[numSent:]
+    #if __debug__ and numSent:
+      #log.debug("Sent data: %s" % self.tx_buf[:numSent])
+      #log.debug("Still %i bytes left" % (len(self.tx_buf)))
 
   def handle_close(self):
     #This seems to be only called when the other side closes the connection
@@ -184,17 +189,24 @@ class Keep_Alive_Transport(xmlrpclib.Transport):
   """
   def __init__(self, *args, **kwargs):
     xmlrpclib.Transport.__init__(self, *args, **kwargs)
-    self.hosts = {}
+    self.sessions = []
 
   def request(self, host, handler, request_body, verbose=0):
     """Send a complete request, and parse the response.
        Return a Deferred response object.       
     """
-    if self.hosts.has_key(host) and self.hosts[host].connected:
-      pass
-    else:
-      self.hosts[host] = Keep_Alive_Session(host, request_body, self)
-    return (self.hosts[host].send_request(request_body),)
+    #From the comments in the Transport class it appears that there will only be one host
+    session = None
+    for session in self.sessions:
+      if not session.waiting_on_response:
+        usable_session = session
+        break
+
+    if session is None or session.waiting_on_response:
+      session = Keep_Alive_Session(host, request_body, self)
+      self.sessions.append(session)
+
+    return (session.send_request(request_body),)
 
 
 class AsyncXMLRPCTransport(xmlrpclib.Transport):
@@ -361,8 +373,8 @@ if __name__ == '__main__':
   import logging
   logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(msecs)03d %(levelname)-8s %(name)-8s %(message)s', datefmt='%H:%M:%S')
 
-  srv_async = xmlrpclib.ServerProxy("http://192.168.1.66:8080", Keep_Alive_Transport())
-  #srv_async = xmlrpclib.ServerProxy("http://localhost:8080", Keep_Alive_Transport())
+  #srv_async = xmlrpclib.ServerProxy("http://192.168.1.66:8080", Keep_Alive_Transport())
+  srv_async = xmlrpclib.ServerProxy("http://localhost:8080", Keep_Alive_Transport())
 
   def on_result(result):
     print result
