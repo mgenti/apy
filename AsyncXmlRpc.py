@@ -38,7 +38,7 @@ or provide event-based interlocks.   The xmlrpclib.MultiCall class provides Mult
 """
 
 
-import sys, xmlrpclib, SimpleXMLRPCServer
+import sys, xmlrpclib, SimpleXMLRPCServer, logging
 
 import Deferred
 
@@ -208,9 +208,14 @@ class MedusaXmlRpcCollector(object):
 
 
 class HttpXmlRpcServer(object):
-    def __init__(self, addr, logResponses=True, logRequests=True, status=False):
-        self.httpSrv = http_server.http_server(addr[0], addr[1], logger_object=logger.python_logger())
-        self.xmlRpcDispatcher = MedusaXmlRpcHandler(logger_object=logger.python_logger(), logRequests=logRequests, logResponses=logResponses)
+    def __init__(self, addr, logHttp=True, logResponses=True, logRequests=True, status=False):
+        if not logHttp:
+            _level = logging.ERROR
+        else:
+            _level = logging.INFO
+
+        self.httpSrv = http_server.http_server(addr[0], addr[1], logger_object=logger.python_logger(level=_level))
+        self.xmlRpcDispatcher = MedusaXmlRpcHandler(logger_object=logger.python_logger(level=_level), logRequests=logRequests, logResponses=logResponses)
         self.httpSrv.install_handler(self.xmlRpcDispatcher)
         if status:
             sh = status_handler.status_extension([self.httpSrv, self.xmlRpcDispatcher])
