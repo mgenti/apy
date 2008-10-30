@@ -265,8 +265,6 @@ class Fault(Error):
         Error.__init__(self)
         self.faultCode = faultCode
         self.faultString = faultString
-        import traceback
-        self.faultString+=traceback.format_exc()
     def __repr__(self):
         return (
             "<Fault %s: %s>" %
