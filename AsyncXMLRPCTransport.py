@@ -63,6 +63,11 @@ class Keep_Alive_Session(asyncore.dispatcher):
 
     #log.debug("New Keep_Alive_Session Created")
 
+  def close(self):
+    asyncore.dispatcher.close(self)
+    if callable(self.close_callable):
+      self.close_callable(self)
+
   def dispatchXmlResponse(self, response):
       p, u = self.getparser()
       try:
@@ -190,8 +195,20 @@ class Keep_Alive_Transport(xmlrpclib.Transport):
     xmlrpclib.Transport.__init__(self, *args, **kwargs)
     self.sessions = []
 
+  def clear_sessions(self):
+    cntr = 0
+    for session in self.sessions:
+      if not session.waiting_on_response or session.writable():
+        session.close()
+        cntr += 1
+    if __debug__:
+      log.debug("Cleared %i sessions" % cntr)
+
   def on_close(self, session):
-    self.sessions.remove(session)
+    try:
+      self.sessions.remove(session)
+    except ValueError:
+      pass
 
   def request(self, host, handler, request_body, verbose=0):
     """Send a complete request, and parse the response.
@@ -206,6 +223,8 @@ class Keep_Alive_Transport(xmlrpclib.Transport):
     if session is None or session.waiting_on_response:
       session = Keep_Alive_Session(host, self, self.on_close)
       self.sessions.append(session)
+      if __debug__:
+        log.debug("Created new seesion")
 
     return (session.send_request(request_body),)
 
