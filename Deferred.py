@@ -37,6 +37,8 @@ class Deferred(object):
       self.fn, self.lno, self.func = log.findCaller()
     self.callback = None
     self.errback = None
+    self.called = False
+    self.errored = False
 
   def __call__(self, *args, **kwargs):
     self.runCallback(*args, **kwargs)
@@ -48,10 +50,12 @@ class Deferred(object):
   def runCallback(self, *args, **kwargs):
     if callable(self.callback):    
       self.callback(*args, **kwargs)
+      self.called = True
 
   def runErrback(self, *args, **kwargs):
     if callable(self.errback):
       self.errback(*args, **kwargs)
+      self.errored = True
     else:
       log.error(str(args[0]))
       if __debug__: log.exception('errback is not callbable')
