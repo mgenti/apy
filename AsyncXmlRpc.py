@@ -38,7 +38,7 @@ or provide event-based interlocks.   The xmlrpclib.MultiCall class provides Mult
 """
 
 
-import sys, xmlrpclib, SimpleXMLRPCServer, logging
+import sys, xmlrpclib, SimpleXMLRPCServer, logging, binascii
 
 import Deferred
 
@@ -107,7 +107,13 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
         if self.logRequests:
             try:
                 params, method = xmlrpclib.loads(data)
-                self.logger.log('%s%s' % (method, params))
+                msg = '%s(' % (method)
+                for param in params:
+                    if isinstance(param, xmlrpclib.Binary):
+                        msg += "%s, " % (binascii.hexlify(param.data))
+                    else:
+                        msg += "%s, " % (param)
+                self.logger.log("%s)" % (msg))
             except:
                 pass
 
