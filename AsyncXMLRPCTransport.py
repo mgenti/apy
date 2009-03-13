@@ -85,9 +85,11 @@ class Keep_Alive_Session(asyncore.dispatcher):
 
   def handle_close(self):
     #This seems to be only called when the other side closes the connection
-    self.close()
-    if callable(self.close_callable):
-      self.close_callable(self)
+    self.handle_expt() #See if there is an error message we can send
+    if not self.deferred.errored:
+      #We haven't called errorback yet so come up with an error
+      self.deferred.runErrback(socket.error((10054, "The underlying connection was closed: The connection was closed unexpectedly.")))
+      self.close()
 
   def handle_connect(self):
     #Try to start sending once connected
@@ -106,6 +108,7 @@ class Keep_Alive_Session(asyncore.dispatcher):
     #Called when a connection fails (Windows), or when out-of-band data arrives (Unix)
 
     #Since we aren't doing OOB
+
     err = self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
     if err:
       msg = os.strerror(err)
