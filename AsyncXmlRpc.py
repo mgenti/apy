@@ -38,7 +38,7 @@ or provide event-based interlocks.   The xmlrpclib.MultiCall class provides Mult
 """
 
 
-import sys, xmlrpclib, SimpleXMLRPCServer, logging, binascii
+import sys, xmlrpclib, SimpleXMLRPCServer, logging, binascii, asynchat
 
 import Deferred
 
@@ -122,7 +122,7 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
             response.addCallbacks(collector.marshalAndSendResponse)
 
             def onClose(self=self, channel=collector.request.channel, deferred=response):
-                channel.close()
+                asynchat.async_chat.close(channel)
                 for callback in self.closeCallbacks:
                     try:
                         callback(deferred)
@@ -130,6 +130,7 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
                         self.logger.log("An error occurred while notifying a callback of a close event")
 
             collector.request.channel.handle_close = onClose
+            collector.request.channel.close = onClose
         else:
             # got a valid XML RPC response
             collector.sendResponse(response)
