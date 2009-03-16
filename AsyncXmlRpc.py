@@ -214,6 +214,12 @@ class MedusaXmlRpcCollector(object):
             self.logger.log(response)
 
 
+class MedusaXmlRpcChannel(http_server.http_channel):
+    def check_maintenance(self):
+        #TODO: implement some better channel maintenance
+        pass
+
+
 class HttpXmlRpcServer(object):
     def __init__(self, addr, logHttp=True, logResponses=True, logRequests=True, status=False):
         if not logHttp:
@@ -222,6 +228,7 @@ class HttpXmlRpcServer(object):
             _level = logging.INFO
 
         self.httpSrv = http_server.http_server(addr[0], addr[1], logger_object=logger.python_logger(level=_level))
+        self.httpSrv.channel_class = MedusaXmlRpcChannel
         self.xmlRpcDispatcher = MedusaXmlRpcHandler(logger_object=logger.python_logger(level=_level), logRequests=logRequests, logResponses=logResponses)
         self.httpSrv.install_handler(self.xmlRpcDispatcher)
         if status:
