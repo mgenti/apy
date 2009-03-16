@@ -1,4 +1,4 @@
-#Copyright (c) 2007 David Ewing Mark Guagenti
+#Copyright (c) 2007-2009 David Ewing Mark Guagenti
 
 #Permission is hereby granted, free of charge, to any person
 #obtaining a copy of this software and associated documentation
@@ -149,7 +149,7 @@ class Keep_Alive_Session(asyncore.dispatcher):
     #print "send_request CALLED"
     assert not self.closing
     if self.waiting_on_response:
-      raise Exception("BAD!!!")
+      raise Exception("Cannot send request while still waiting for a response")
 
     keep_alive = "\r\n"
     if not self.connected:
