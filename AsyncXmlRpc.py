@@ -128,6 +128,8 @@ class MedusaXmlRpcHandler(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
                         callback(deferred)
                     except:
                         self.logger.log("An error occurred while notifying a callback of a close event")
+                if __debug__:
+                    self.logger.log("Socket closed")
 
             collector.request.channel.handle_close = onClose
             collector.request.channel.close = onClose
