@@ -119,7 +119,7 @@ class EventScheduler(object):
     for mye in self.eventQueue:
       try:
         print mye.params[0], mye.fireTime, mye.delay
-      except:
+      except IndexError:
         print "no params", mye.fireTime, mye.delay
 
   def unschedule(self, event):
