@@ -227,7 +227,7 @@ class Keep_Alive_Transport(xmlrpclib.Transport):
       session = Keep_Alive_Session(host, self, self.on_close)
       self.sessions.append(session)
       if __debug__:
-        log.debug("Created new seesion")
+        log.debug("Created new session")
 
     return (session.send_request(request_body),)
 
