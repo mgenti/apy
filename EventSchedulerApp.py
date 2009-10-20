@@ -9,6 +9,10 @@ import EventScheduler
 
 MAINLOOP_PLATFORMS = ['__WXGTK__']
 
+SLEEP_TIME = 0.001
+if wx.Platform != '__WXMSW__':
+    SLEEP_TIME = 0.03
+
 
 class EventSchedulerApp(wx.App):
     def __init__(self, *args, **kwargs):
@@ -28,7 +32,7 @@ class EventSchedulerApp(wx.App):
             self.runFuncs()
             self._chkTimer.Start(2, True)
 
-    def runFuncs(self, tSlice=0.001):
+    def runFuncs(self, tSlice=SLEEP_TIME):
         asyncore.poll(tSlice)
         self.evScheduler.poll()
 
@@ -83,7 +87,6 @@ class EventSchedulerApp(wx.App):
             # throttle this back a bit somehow so there is not too
             # much CPU time spent in the idle handlers.  For this
             # example, I'll just snooze a little...
-            time.sleep(0.10)
             self.ProcessIdle()
 
         wx.EventLoop.SetActive(old)
