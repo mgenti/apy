@@ -1,5 +1,5 @@
-# (c) Copyright 2007, Synapse
-"""Combines EventScheduler, asyncore, and wxPython App"""
+# (c) Copyright 2007-2009, Synapse Wireless, Inc.
+"""Combines EventScheduler, asyncore, and wx.App"""
 
 
 import time, asyncore
@@ -7,7 +7,7 @@ import wx
 import EventScheduler
 
 
-MAINLOOP_PLATFORMS = ['__WXGTK__']
+MAINLOOP_PLATFORMS = []
 
 SLEEP_TIME = 0.001
 if wx.Platform != '__WXMSW__':
