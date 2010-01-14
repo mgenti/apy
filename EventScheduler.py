@@ -90,7 +90,7 @@ class EventScheduler(object):
     self.lock.release()
 
   def poll(self):
-    """Run the event scheduler"""
+    """Run the event scheduler, return the number of events called"""
     self.lock.acquire()
     self.eventQueue.sort(key=EventElement.sortKey)
     i = bisect.bisect_right(self.eventQueue, EventElement(None, 0))
@@ -113,6 +113,8 @@ class EventScheduler(object):
         self.lock.acquire()
         self.eventQueue.append(e)
         self.lock.release()
+
+    return i
 
   def printQueue(self):
     """Debugging helper"""
