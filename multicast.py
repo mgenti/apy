@@ -41,7 +41,7 @@ class MulticastListener(asyncore.dispatcher):
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         except AttributeError:
             pass #Not all versions of Python have SO_REUSEPORT
-        #self.socket.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_TTL, 255) # Don't think we need this since we are just a listener
+        self.socket.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_TTL, 255) # Don't think we need this since if we are just a listener
         self.socket.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_LOOP, loopback)
 
         #Zeroconf has try around next line
