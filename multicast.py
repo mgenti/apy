@@ -32,7 +32,10 @@ class MulticastListener(asyncore.dispatcher):
     def __init__(self, mcast_addr, port, loopback=1):
         self.mcast_addr = mcast_addr
         asyncore.dispatcher.__init__(self)
-        self.intf = socket.gethostbyname(socket.gethostname())
+        try:
+            self.intf = socket.gethostbyname(socket.gethostname())
+        except socket.gaierror:
+            self.intf = socket.gethostbyname('localhost')
 
         #Setup socket
         self.create_socket(socket.AF_INET, socket.SOCK_DGRAM)
