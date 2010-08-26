@@ -42,7 +42,7 @@ import sys, xmlrpclib, SimpleXMLRPCServer, logging, binascii, asynchat
 
 import Deferred
 
-from .medusa import http_server, logger, status_handler, counter, producers
+from medusa import http_server, logger, status_handler, counter, producers
 
 
 #Monkey patch for SimpleXMLRPCServer.SimpleXMLRPCDispatcher._marshaled_dispatch to support deferreds
