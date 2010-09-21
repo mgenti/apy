@@ -49,7 +49,7 @@ import logging
 import Deferred
 import sys
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("apy.%s" % (__name__))
 
 
 class AsyncXMLRPCRequestHandler(asyncore.dispatcher):

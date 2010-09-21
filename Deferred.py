@@ -23,7 +23,7 @@
 
 
 import logging
-log = logging.getLogger(__name__)
+log = logging.getLogger("apy.%s" % (__name__))
 
 
 class Deferred(object):

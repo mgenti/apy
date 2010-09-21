@@ -35,7 +35,7 @@ import httplib
 import cStringIO
 
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("apy.%s" % (__name__))
 
 
 class HttpLibFakeSocket(object):
