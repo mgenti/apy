@@ -101,7 +101,8 @@ class EventScheduler(object):
     for e in workq:
       rv = e.func(*e.params, **e.kwargs)
       if isinstance(rv, bool):
-        reschedule = rv
+        if rv:
+          reschedule = rv
       elif isinstance(rv, float) or isinstance(rv, int):
         e.delay = rv
         reschedule = True

@@ -14,13 +14,16 @@ class IOLoopEventElement(object):
         self.kwargs = kwargs
         self.delay = delay
         self._running = True
+        self._ioloop_timeout = None
 
     def run(self):
         value = self.func(*self.args, **self.kwargs)
         self._running = False
         if isinstance(value, bool):
-            tornado.ioloop.IOLoop.instance().add_timeout(time.time() + self.delay, self.run)
-            self._running = True
+            # bool inherits from int
+            if value:
+                tornado.ioloop.IOLoop.instance().add_timeout(time.time() + self.delay, self.run)
+                self._running = True
         elif isinstance(value, float) or isinstance(value, int):
             self.delay = value
             tornado.ioloop.IOLoop.instance().add_timeout(time.time() + self.delay, self.run)
@@ -41,8 +44,9 @@ class IOLoopEventElement(object):
 def schedule(delay, callable, *args, **kwargs):
     """Emulates the EventScheduler.schedule API"""
     event = IOLoopEventElement(callable, delay, *args, **kwargs)
-    tornado.ioloop.IOLoop.instance().add_timeout(time.time() + delay, event.run)
+    self._ioloop_timeout = tornado.ioloop.IOLoop.instance().add_timeout(time.time() + delay, event.run)
     return event
+
 
 class IOLoopScheduler(object):
     def schedule(self, delay, callable, *args, **kwargs):
