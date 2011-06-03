@@ -28,6 +28,8 @@ import bisect
 import operator
 #import sys
 
+import monotime
+
 
 class EventElement(object):
   def __init__(self, func, delay=0.0, *args, **kwargs):
@@ -35,7 +37,7 @@ class EventElement(object):
     self.params = args
     self.kwargs = kwargs
     self.delay = delay
-    self.fireTime = time.time() + delay
+    self.fireTime = monotime.monotonic_time() + delay
 
   def sortKey(self):
     return self.fireTime
@@ -108,7 +110,7 @@ class EventScheduler(object):
       else:
         reschedule = False
       if reschedule:
-        e.fireTime = time.time() + e.delay
+        e.fireTime = monotime.monotonic_time() + e.delay
         #e.fireTime += e.delay     # If we wanted accurate periodicity, versus accurate intervals
         self.lock.acquire()
         self.eventQueue.append(e)
@@ -133,6 +135,9 @@ class EventScheduler(object):
 
 #---------------------------------------------------------------------------------------------------
 if __name__=='__main__':
+  import time
+  import timeit
+
   sked = EventScheduler()
   
   class Test:
@@ -178,7 +183,6 @@ if __name__=='__main__':
     if immediateCount % 1000 == 0:
       print "immediateCount: %d" % immediateCount
 
-  import timeit
   t = timeit.Timer("sked.scheduleEvent(immediateFunc)", "from __main__ import sked, immediateFunc")
   print t.timeit(10000)
 
@@ -194,6 +198,3 @@ if __name__=='__main__':
   while True:
     sked.poll()
     time.sleep(0.1)
-
-
-#---------------------------------------------------------------------------------------------------
