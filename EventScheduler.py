@@ -30,12 +30,12 @@ import operator
 
 
 class EventElement(object):
-  def __init__(self, func, delay=0.0, *args, **kwargs):
+  def __init__(self, func, delay=0.0, time_func=time.time, *args, **kwargs):
     self.func = func
     self.params = args
     self.kwargs = kwargs
     self.delay = delay
-    self.fireTime = time.time() + delay
+    self.fireTime = time_func() + delay
 
   def sortKey(self):
     return self.fireTime
@@ -53,14 +53,15 @@ class EventElement(object):
 #---------------------------------------------------------------------------------------------------
 class EventScheduler(object):
   """Event queue mechanism, asynchronously polled, dispatching bound methods with optional delay."""
-  def __init__(self):
+  def __init__(self, time_func=time.time):
     self.eventQueue = []
     self.lock = threading.RLock()
+    self.time = time_func
 
   def schedule(self, delay, callable, *args, **kwargs):
     """Order of parameters is like wx.CallLater and supports keyword arguments unlike scheduleEvent"""
     #print "%s scheduled %s" % (sys._getframe(1).f_code.co_name, callable.im_func.func_name)
-    event = EventElement(callable, delay, *args, **kwargs)
+    event = EventElement(callable, delay, self.time, *args, **kwargs)
     self.lock.acquire()
     self.eventQueue.append(event)
     self.lock.release()
@@ -76,7 +77,7 @@ class EventScheduler(object):
     """
     #print "%s scheduled event %s" % (sys._getframe(0).f_code.co_name, func.im_func.func_name)
     self.lock.acquire()
-    self.eventQueue.append(EventElement(func, delay, *params))
+    self.eventQueue.append(EventElement(func, delay, self.time, *params))
     self.lock.release()
 
   def scheduleEvents(self, eventList):
@@ -93,7 +94,7 @@ class EventScheduler(object):
     """Run the event scheduler, return the number of events called"""
     self.lock.acquire()
     self.eventQueue.sort(key=EventElement.sortKey)
-    i = bisect.bisect_right(self.eventQueue, EventElement(None, 0))
+    i = bisect.bisect_right(self.eventQueue, EventElement(None, 0, self.time))
     workq = self.eventQueue[:i]
     self.eventQueue = self.eventQueue[i:]
     self.lock.release()
@@ -108,7 +109,7 @@ class EventScheduler(object):
       else:
         reschedule = False
       if reschedule:
-        e.fireTime = time.time() + e.delay
+        e.fireTime = self.time() + e.delay
         #e.fireTime += e.delay     # If we wanted accurate periodicity, versus accurate intervals
         self.lock.acquire()
         self.eventQueue.append(e)
@@ -134,7 +135,7 @@ class EventScheduler(object):
 #---------------------------------------------------------------------------------------------------
 if __name__=='__main__':
   sked = EventScheduler()
-  
+
   class Test:
     "Test EventScheduler with bound methods"
     def a(self):
@@ -160,7 +161,7 @@ if __name__=='__main__':
       return False
 
 
-  x = Test()  
+  x = Test()
   sked.scheduleEvent(x.a, delay = 3.0)
   sked.scheduleEvent(x.b, [" demo ", "parameter"], delay = 10.0)
   sked.scheduleEvent(C())
