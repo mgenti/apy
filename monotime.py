@@ -50,12 +50,13 @@ else:
     librt = ctypes.CDLL(LINUX_LIBRT, use_errno=True)
     clock_gettime = librt.clock_gettime
     clock_gettime.argtypes = [ctypes.c_int, ctypes.POINTER(timespec)]
+    clock_gettime.restype = ctypes.c_int
+    g_timespec = timespec()
     def monotonic_time():
-        t = timespec()
-        if clock_gettime(CLOCK_MONOTONIC_RAW, ctypes.byref(t)) != 0:
+        if clock_gettime(CLOCK_MONOTONIC_RAW, ctypes.byref(g_timespec)) != 0:
             errno_ = ctypes.get_errno()
             raise OSError(errno_, os.strerror(errno_))
-        return t.tv_sec + t.tv_nsec / 1e9
+        return g_timespec.tv_sec + g_timespec.tv_nsec / 1e9
 
 
 if __name__ == "__main__":
