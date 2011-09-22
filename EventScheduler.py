@@ -128,7 +128,10 @@ class EventScheduler(object):
   def unschedule(self, event):
     """Removes the scheduled event from the queue"""
     self.lock.acquire()
-    self.eventQueue.remove(event)
+    try:
+      self.eventQueue.remove(event)
+    except ValueError:
+      pass # No need to error if it is not in the queue
     self.lock.release()
 
 
