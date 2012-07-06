@@ -15,6 +15,7 @@ class WxLoopEventElement(object):
         self.delay = delay
         self._running = True
         self._ioloop_timeout = None
+        self._wx_event = None
 
     def run(self):
         value = self.func(*self.args, **self.kwargs)
@@ -22,20 +23,20 @@ class WxLoopEventElement(object):
         if isinstance(value, bool):
             # bool inherits from int
             if value:
-                wx.CallLater(time.time() + self.delay, self.run)
+                self._wx_event = wx.CallLater(self.delay*1000, self.run)
                 self._running = True
         elif isinstance(value, float) or isinstance(value, int):
             self.delay = value
-            wx.CallLater(time.time() + self.delay, self.run)
+            self._wx_event = wx.CallLater(self.delay*1000, self.run)
             self._running = True
 
     def start(self):
-        wx.CallLater(time.time() + self.delay, self.run)
+        self._wx_event = wx.CallLater(self.delay*1000, self.run)
         self._running = True
         self.func = self.orig_func
 
     def Stop(self, *args, **kwargs):
-        self.func = self.Stop
+        self._wx_event.Stop()
         self._running = False
 
     stop = Stop
@@ -53,18 +54,18 @@ class WxLoopScheduler(object):
         """Emulates the EventScheduler.schedule API"""
         event = WxLoopEventElement(callable, delay, *args, **kwargs)
         if delay == 0.0:
-            wx.CallAfter(event.run)
+            event._wx_event = wx.CallAfter(event.run)
         else:
-            wx.CallLater(delay*1000, event.run)
+            event._wx_event = wx.CallLater(delay*1000, event.run)
         return event
 
     def scheduleEvent(self, func, params=[], delay=0.0):
         """Emulates the EventScheduler.scheduleEvent API"""
         event = WxLoopEventElement(func, delay, *params)
         if delay == 0.0:
-            wx.CallAfter(event.run)
+            event._wx_event = wx.CallAfter(event.run)
         else:
-            wx.CallLater(delay*1000, event.run)
+            event._wx_event = wx.CallLater(delay*1000, event.run)
         return event
 
     @classmethod
