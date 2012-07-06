@@ -55,7 +55,7 @@ class WxLoopScheduler(object):
         if delay == 0.0:
             wx.CallAfter(event.run)
         else:
-            wx.CallLater(time.time() + delay, event.run)
+            wx.CallLater(delay*1000, event.run)
         return event
 
     def scheduleEvent(self, func, params=[], delay=0.0):
@@ -64,7 +64,7 @@ class WxLoopScheduler(object):
         if delay == 0.0:
             wx.CallAfter(event.run)
         else:
-            wx.CallLater(time.time() + delay, event.run)
+            wx.CallLater(delay*1000, event.run)
         return event
 
     @classmethod
