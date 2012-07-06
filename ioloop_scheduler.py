@@ -17,6 +17,11 @@ class IOLoopEventElement(object):
         self._ioloop_timeout = None
 
     def run(self):
+        if self.func == self.Stop:
+            # Do nothing and delete reference to yourself
+            self.func = None
+            return
+
         value = self.func(*self.args, **self.kwargs)
         self._running = False
         if isinstance(value, bool):
