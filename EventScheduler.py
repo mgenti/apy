@@ -57,6 +57,7 @@ class EventScheduler(object):
     self.eventQueue = []
     self.lock = threading.RLock()
     self.time = time_func
+    self.running = False
 
   def schedule(self, delay, callable, *args, **kwargs):
     """Order of parameters is like wx.CallLater and supports keyword arguments unlike scheduleEvent"""
@@ -92,6 +93,10 @@ class EventScheduler(object):
 
   def poll(self):
     """Run the event scheduler, return the number of events called"""
+    if self.running:
+      #print "bailing! poll called while in the middle of another poll"
+      return 0
+
     self.lock.acquire()
     self.eventQueue.sort(key=EventElement.sortKey)
     i = bisect.bisect_right(self.eventQueue, EventElement(None, 0, self.time))
@@ -99,6 +104,7 @@ class EventScheduler(object):
     self.eventQueue = self.eventQueue[i:]
     self.lock.release()
 
+    self.running = True
     for e in workq:
       rv = e.func(*e.params, **e.kwargs)
       if isinstance(rv, bool):
@@ -114,6 +120,7 @@ class EventScheduler(object):
         self.lock.acquire()
         self.eventQueue.append(e)
         self.lock.release()
+    self.running = False
 
     return i
 
