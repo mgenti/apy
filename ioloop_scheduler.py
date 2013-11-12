@@ -54,10 +54,16 @@ def schedule(delay, callable, *args, **kwargs):
 
 
 class IOLoopScheduler(object):
+    def __init__(self, io_loop=None):
+        print io_loop
+        if io_loop is None:
+            io_loop = tornado.ioloop.IOLoop.instance()
+        self.io_loop = io_loop
+
     def schedule(self, delay, callable, *args, **kwargs):
         """Emulates the EventScheduler.schedule API"""
         event = IOLoopEventElement(callable, delay, *args, **kwargs)
-        tornado.ioloop.IOLoop.instance().add_timeout(tornado.ioloop.IOLoop.instance().timefunc() + delay, event.run)
+        self.io_loop.add_timeout(self.io_loop.timefunc() + delay, event.run)
         return event
 
     @classmethod
