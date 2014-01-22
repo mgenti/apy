@@ -15,6 +15,7 @@ class IOLoopEventElement(object):
         self.delay = delay
         self._running = True
         self._ioloop_timeout = None
+        self.io_loop = tornado.ioloop.IOLoop.instance()
 
     def run(self):
         if self.func == self.Stop:
@@ -27,15 +28,15 @@ class IOLoopEventElement(object):
         if isinstance(value, bool):
             # bool inherits from int
             if value:
-                tornado.ioloop.IOLoop.instance().add_timeout(tornado.ioloop.IOLoop.instance().timefunc() + self.delay, self.run)
+                self.io_loop.add_timeout(self.io_loop.timefunc() + self.delay, self.run)
                 self._running = True
         elif isinstance(value, float) or isinstance(value, int):
             self.delay = value
-            tornado.ioloop.IOLoop.instance().add_timeout(tornado.ioloop.IOLoop.instance().timefunc() + self.delay, self.run)
+            self.io_loop.add_timeout(self.io_loop.timefunc() + self.delay, self.run)
             self._running = True
 
     def start(self):
-        tornado.ioloop.IOLoop.instance().add_timeout(tornado.ioloop.IOLoop.instance().timefunc() + self.delay, self.run)
+        self.io_loop.add_timeout(self.io_loop.timefunc() + self.delay, self.run)
         self._running = True
         self.func = self.orig_func
 
@@ -55,15 +56,19 @@ def schedule(delay, callable, *args, **kwargs):
 
 class IOLoopScheduler(object):
     def __init__(self, io_loop=None):
-        print io_loop
         if io_loop is None:
             io_loop = tornado.ioloop.IOLoop.instance()
         self.io_loop = io_loop
 
     def schedule(self, delay, callable, *args, **kwargs):
         """Emulates the EventScheduler.schedule API"""
+        #Only add_callback is thread safe
         event = IOLoopEventElement(callable, delay, *args, **kwargs)
-        self.io_loop.add_timeout(self.io_loop.timefunc() + delay, event.run)
+        event.io_loop = self.io_loop
+        deadline = self.io_loop.timefunc() + delay
+        def callback():
+            self.io_loop.add_timeout(deadline, event.run)
+        self.io_loop.add_callback(callback)
         return event
 
     @classmethod
