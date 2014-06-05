@@ -62,13 +62,10 @@ class IOLoopScheduler(object):
 
     def schedule(self, delay, callable, *args, **kwargs):
         """Emulates the EventScheduler.schedule API"""
-        #Only add_callback is thread safe
         event = IOLoopEventElement(callable, delay, *args, **kwargs)
         event.io_loop = self.io_loop
-        deadline = self.io_loop.timefunc() + delay
-        def callback():
-            self.io_loop.add_timeout(deadline, event.run)
-        self.io_loop.add_callback(callback)
+        deadline = event.io_loop.time_func() + event.delay
+        self.io_loop.add_callback(lambda: event.io_loop.add_timeout(deadline, event.run))  # Only add_callback is thread safe
         return event
 
     @classmethod
