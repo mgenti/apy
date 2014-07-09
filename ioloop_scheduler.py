@@ -65,7 +65,12 @@ class IOLoopScheduler(object):
         event = IOLoopEventElement(callable, delay, *args, **kwargs)
         event.io_loop = self.io_loop
         deadline = event.io_loop.time_func() + event.delay
-        self.io_loop.add_callback(lambda: event.io_loop.add_timeout(deadline, event.run))  # Only add_callback is thread safe
+        if delay == 0:
+            callback = event.run
+        else:
+            # Only add_callback is thread safe so we must use it to schedule the future event
+            callback = lambda: event.io_loop.add_timeout(deadline, event.run)
+        self.io_loop.add_callback(callback)
         return event
 
     @classmethod
